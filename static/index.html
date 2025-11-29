@@ -1,0 +1,11 @@
+<html>
+<body>
+  <h1>ESP32-CAM Viewer</h1>
+  <img id="cam" src="/latest.jpg" width="90%">
+  <script>
+    setInterval(() => {
+      document.getElementById("cam").src = "/latest.jpg?t=" + Date.now();
+    }, 2000);
+  </script>
+</body>
+</html>
