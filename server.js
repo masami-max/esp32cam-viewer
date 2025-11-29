@@ -1,46 +1,50 @@
 const express = require("express");
 const app = express();
+const path = require("path");
 
-// ルートアクセス → 動作確認用
+// 画像をメモリに保持
+let latestImage = null;
+
+// 画像アップロード（ESP32-CAM → サーバー）
+app.post("/upload", express.raw({ type: "image/jpeg", limit: "10mb" }), (req, res) => {
+  console.log("Image received:", req.body.length, "bytes");
+  latestImage = req.body;   // 最新画像を保存
+  res.send("OK");
+});
+
+// 最新画像を返す（viewページから使う）
+app.get("/latest.jpg", (req, res) => {
+  if (!latestImage) {
+    return res.status(404).send("No image yet");
+  }
+  res.set("Content-Type", "image/jpeg");
+  res.send(latestImage);
+});
+
+// Web画面（ブラウザ用）
+app.get("/view", (req, res) => {
+  res.send(`
+    <html>
+    <body style="text-align:center;">
+      <h1>ESP32-CAM Viewer</h1>
+      <img id="cam" src="/latest.jpg" width="80%">
+      <script>
+        setInterval(() => {
+          document.getElementById("cam").src = "/latest.jpg?t=" + new Date().getTime();
+        }, 2000);
+      </script>
+    </body>
+    </html>
+  `);
+});
+
+// 動作確認用ルート
 app.get("/", (req, res) => {
-  res.send("ESP32-CAM Viewer Server is running!");
+  res.send('ESP32-CAM Viewer Server is running! /view にアクセスしてください。');
 });
 
 // 起動
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("Server running on port " + PORT);
-});
-const multer = require('multer');
-const fs = require('fs');
-
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
-
-let latestImageBase64 = null;
-
-// 画像受け取り API
-app.post('/upload-image', upload.single('image'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).send('No image received');
-  }
-
-  latestImageBase64 = req.file.buffer.toString('base64');
-  console.log("Image received: " + req.file.size + " bytes");
-
-  res.send('Image uploaded OK');
-});
-
-// ブラウザから最新画像を取得
-app.get('/latest-image', (req, res) => {
-  if (!latestImageBase64) {
-    return res.status(404).send('No image yet');
-  }
-
-  const img = Buffer.from(latestImageBase64, 'base64');
-  res.writeHead(200, {
-    'Content-Type': 'image/jpeg',
-    'Content-Length': img.length
-  });
-  res.end(img);
 });
