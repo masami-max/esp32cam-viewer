@@ -31,7 +31,7 @@ app.get("/view", (req, res) => {
       <script>
         setInterval(() => {
           document.getElementById("cam").src = "/latest.jpg?t=" + new Date().getTime();
-        }, 2000);
+        }, 10000);
       </script>
     </body>
     </html>
