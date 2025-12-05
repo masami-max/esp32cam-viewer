@@ -24,16 +24,40 @@ app.get("/latest.jpg", (req, res) => {
 app.get("/view", (req, res) => {
   res.send(`
     <html>
-    <body style="text-align:center;">
+    <head>
+      <style>
+        body {
+          text-align: center;
+          font-family: sans-serif;
+        }
+        #cam {
+          margin-top: 20px;
+          max-width: 90%;
+          height: auto;
+          border: 1px solid #ccc;
+          display: block;
+          margin-left: auto;
+          margin-right: auto;
+        }
+        #refreshBtn {
+          margin-top: 20px;
+          padding: 10px 20px;
+          font-size: 18px;
+        }
+      </style>
+    </head>
+    <body>
       <h1>ESP32-CAM Viewer (Manual Refresh)</h1>
 
-      <img id="cam" src="/latest.jpg" width="80%" style="border:1px solid #ccc;">
-      <br><br>
-      <button onclick="refreshImg()" style="font-size:20px;">画像更新</button>
+      <button id="refreshBtn" onclick="reloadImage()">画像更新</button>
+
+      <img id="cam" src="/latest.jpg" alt="no image">
 
       <script>
-        function refreshImg() {
-          document.getElementById("cam").src = "/latest.jpg?t=" + Date.now();
+        function reloadImage() {
+          const img = document.getElementById("cam");
+          // キャッシュ対策
+          img.src = "/latest.jpg?t=" + new Date().getTime();
         }
       </script>
     </body>
