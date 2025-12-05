@@ -1,46 +1,56 @@
+// server.js
 const express = require("express");
-const app = express();
+const fs = require("fs");
 const path = require("path");
+const app = express();
 
-// 画像をメモリに保持
-let latestImage = null;
+// メモリ内に最新画像を保持（高速応答）
+let latestImageBuffer = null;
 
-// 画像アップロード（ESP32-CAM → サーバー）
+// --- 静的ファイル（static フォルダ）を配信 ---
+app.use(express.static(path.join(__dirname, "static")));
+
+// --- 画像アップロード（ESP32 -> サーバー） ---
+// image/jpeg をそのまま受け取る（最大 10MB）
 app.post("/upload", express.raw({ type: "image/jpeg", limit: "10mb" }), (req, res) => {
-  console.log("Image received:", req.body.length, "bytes");
-  latestImage = req.body;   // 最新画像を保存
-  res.send("OK");
-});
+  try {
+    console.log("Image received:", req.body.length, "bytes");
+    latestImageBuffer = req.body;
 
-// 最新画像を返す（viewページから使う）
-app.get("/latest.jpg", (req, res) => {
-  if (!latestImage) {
-    return res.status(404).send("No image yet");
+    // /tmp/latest.jpg にも書き出しておく（Render上での確認や再起動後の振る舞い確認用）
+    try { fs.writeFileSync("/tmp/latest.jpg", latestImageBuffer); } catch (e) { /* ignore if not writable */ }
+
+    res.status(200).send("OK");
+  } catch (err) {
+    console.error("Upload error:", err);
+    res.status(500).send("Upload error");
   }
-  res.set("Content-Type", "image/jpeg");
-  res.send(latestImage);
 });
 
-// Web画面（ブラウザ用）
+// --- 最新画像を返す ---
+app.get("/latest.jpg", (req, res) => {
+  // 優先：メモリ内、次：/tmp/latest.jpg、なければ 404
+  if (latestImageBuffer && latestImageBuffer.length > 0) {
+    res.set("Content-Type", "image/jpeg");
+    return res.send(latestImageBuffer);
+  }
+  const tmpPath = "/tmp/latest.jpg";
+  if (fs.existsSync(tmpPath)) {
+    const buf = fs.readFileSync(tmpPath);
+    res.set("Content-Type", "image/jpeg");
+    return res.send(buf);
+  }
+  return res.status(404).send("No image yet");
+});
+
+// --- view ルート（static/index.html を返す） ---
 app.get("/view", (req, res) => {
-  res.send(`
-    <html>
-    <body style="text-align:center;">
-      <h1>ESP32-CAM Viewer</h1>
-      <img id="cam" src="/latest.jpg" width="80%">
-      <script>
-        setInterval(() => {
-          document.getElementById("cam").src = "/latest.jpg?t=" + new Date().getTime();
-        }, 10000);
-      </script>
-    </body>
-    </html>
-  `);
+  res.sendFile(path.join(__dirname, "static", "index.html"));
 });
 
-// 動作確認用ルート
+// --- 健康チェック用ルート ---
 app.get("/", (req, res) => {
-  res.send('ESP32-CAM Viewer Server is running! /view にアクセスしてください。');
+  res.send("ESP32-CAM Viewer Server is running! visit /view");
 });
 
 // 起動
