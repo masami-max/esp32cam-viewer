@@ -1,27 +1,22 @@
-// ===============================
-// ESP32-CAM Viewer（完全手動更新版）
-// ===============================
-
 const express = require("express");
 const multer  = require("multer");
+const path    = require("path");
 
 const app = express();
 const upload = multer();
 
-// 最新の JPEG 画像を保存する変数
+// 画像を保存する変数
 let latestImage = null;
 
-// ESP32 から画像アップロード（POST）
-// ★絶対に req.file.buffer を使うこと！★
+// ESP32 からの画像アップロード（POST）
 app.post("/upload", upload.single("file"), (req, res) => {
   if (!req.file || !req.file.buffer) {
-    console.log("No file received!");
-    return res.status(400).send("No file received");
+    console.error("No file received!");
+    return res.sendStatus(400);
   }
 
-  latestImage = req.file.buffer;  // ← 正しい！
+  latestImage = req.file.buffer;   // ← これが正しい
   console.log("Image received:", latestImage.length, "bytes");
-
   res.sendStatus(200);
 });
 
@@ -34,7 +29,7 @@ app.get("/latest.jpg", (req, res) => {
   res.send(latestImage);
 });
 
-// 手動ビュー
+// 手動 View
 app.get("/view", (req, res) => {
   res.send(`
     <html>
@@ -71,7 +66,6 @@ app.get("/view", (req, res) => {
   `);
 });
 
-// Render ポート
 const port = process.env.PORT || 10000;
 app.listen(port, () => {
   console.log("Server running on port", port);
