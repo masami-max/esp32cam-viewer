@@ -1,21 +1,24 @@
 const express = require("express");
-const multer  = require("multer");
-const path    = require("path");
+const multer = require("multer");
 
 const app = express();
-const upload = multer();
 
-// 画像を保存する変数
+// バッファとして受け取る
+const upload = multer({
+  storage: multer.memoryStorage()
+});
+
+// 最新画像を保存する変数
 let latestImage = null;
 
-// ESP32 からの画像アップロード（POST）
+// ESP32 からのアップロード処理
 app.post("/upload", upload.single("file"), (req, res) => {
-  if (!req.file || !req.file.buffer) {
-    console.error("No file received!");
+  if (!req.file) {
+    console.log("No file uploaded");
     return res.sendStatus(400);
   }
 
-  latestImage = req.file.buffer;   // ← これが正しい
+  latestImage = req.file.buffer;
   console.log("Image received:", latestImage.length, "bytes");
   res.sendStatus(200);
 });
@@ -25,37 +28,22 @@ app.get("/latest.jpg", (req, res) => {
   if (!latestImage) {
     return res.status(404).send("No image yet");
   }
+
   res.set("Content-Type", "image/jpeg");
   res.send(latestImage);
 });
 
-// 手動 View
+// Viewer ページ
 app.get("/view", (req, res) => {
   res.send(`
     <html>
     <head>
-      <title>ESP32-CAM Viewer (Manual Refresh)</title>
-      <style>
-        body { text-align:center; }
-        #cam {
-          width: 90%;
-          max-width: 600px;
-          border: 2px solid #888;
-          margin-top: 20px;
-        }
-        button {
-          margin-top: 20px;
-          padding: 10px 25px;
-          font-size: 18px;
-        }
-      </style>
+      <title>ESP32-CAM Viewer</title>
     </head>
-    <body>
-      <h1>ESP32-CAM Viewer（Manual Refresh）</h1>
-      <button onclick="refreshImage()">画像更新</button>
-      <br>
-      <img id="cam" src="/latest.jpg" alt="No image">
-
+    <body style="text-align:center;">
+      <h1>ESP32-CAM Viewer</h1>
+      <button onclick="refreshImage()">画像更新</button><br>
+      <img id="cam" src="/latest.jpg" style="width:90%;max-width:600px;margin-top:20px;">
       <script>
         function refreshImage() {
           document.getElementById("cam").src = "/latest.jpg?t=" + Date.now();
@@ -66,6 +54,7 @@ app.get("/view", (req, res) => {
   `);
 });
 
+// ポート
 const port = process.env.PORT || 10000;
 app.listen(port, () => {
   console.log("Server running on port", port);
