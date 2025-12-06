@@ -1,63 +1,65 @@
-const express = require("express");
-const app = express();
+// ===============================
+// ESP32-CAM Viewer（完全手動更新版）
+// ===============================
 
-// 最新画像をメモリに保持
+const express = require("express");
+const multer  = require("multer");
+const path    = require("path");
+
+const app = express();
+const upload = multer();
+
+// 画像を保存する変数
 let latestImage = null;
 
-// ========== 画像アップロード（ESP32 → サーバー） ==========
-app.post("/upload", express.raw({ type: "image/jpeg", limit: "10mb" }), (req, res) => {
-  console.log("Image received:", req.body.length, "bytes");
-  latestImage = req.body;   // 最新画像を保存
-  res.send("OK");
+// ESP32 からの画像アップロード（POST）
+app.post("/upload", upload.single("file"), (req, res) => {
+  latestImage = req.body;       // JPEG バイナリ
+  console.log("Image received:", latestImage.length, "bytes");
+  res.sendStatus(200);
 });
 
-// ========== 最新画像を返す ==========
+// 最新画像を返す
 app.get("/latest.jpg", (req, res) => {
   if (!latestImage) {
-    return res.status(404).send("No image yet");
+    res.status(404).send("No image yet");
+    return;
   }
   res.set("Content-Type", "image/jpeg");
   res.send(latestImage);
 });
 
-// ========== Web画面（ボタンで画像更新） ==========
+// HTML（手動更新）
 app.get("/view", (req, res) => {
   res.send(`
     <html>
     <head>
+      <title>ESP32-CAM Viewer (Manual Refresh)</title>
       <style>
-        body {
-          text-align: center;
-          font-family: sans-serif;
-        }
+        body { text-align:center; }
         #cam {
+          width: 90%;
+          max-width: 600px;
+          border: 2px solid #888;
           margin-top: 20px;
-          max-width: 90%;
-          height: auto;
-          border: 1px solid #ccc;
-          display: block;
-          margin-left: auto;
-          margin-right: auto;
         }
-        #refreshBtn {
+        button {
           margin-top: 20px;
-          padding: 10px 20px;
+          padding: 10px 25px;
           font-size: 18px;
         }
       </style>
     </head>
     <body>
-      <h1>ESP32-CAM Viewer (Manual Refresh)</h1>
-
-      <button id="refreshBtn" onclick="reloadImage()">画像更新</button>
-
-      <img id="cam" src="/latest.jpg" alt="no image">
+      <h1>ESP32-CAM Viewer（Manual Refresh）</h1>
+      <button onclick="refreshImage()">画像更新</button>
+      <br>
+      <img id="cam" src="/latest.jpg" alt="No image">
 
       <script>
-        function reloadImage() {
-          const img = document.getElementById("cam");
-          // キャッシュ対策
-          img.src = "/latest.jpg?t=" + new Date().getTime();
+        function refreshImage() {
+          // キャッシュ防止用に?timestamp を付与
+          document.getElementById("cam").src = "/latest.jpg?t=" + Date.now();
         }
       </script>
     </body>
@@ -65,13 +67,8 @@ app.get("/view", (req, res) => {
   `);
 });
 
-// ========== 動作確認用 ==========
-app.get("/", (req, res) => {
-  res.send("ESP32-CAM Viewer Server is running! /view へアクセスしてください。");
-});
-
-// ========== 起動 ==========
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
+// ポート
+const port = process.env.PORT || 10000;
+app.listen(port, () => {
+  console.log("Server running on port", port);
 });
