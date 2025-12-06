@@ -14,7 +14,12 @@ let latestImage = null;
 
 // ESP32 からの画像アップロード（POST）
 app.post("/upload", upload.single("file"), (req, res) => {
-  latestImage = req.body;       // JPEG バイナリ
+  if (!req.file || !req.file.buffer) {
+    console.log("No file received");
+    return res.sendStatus(400);
+  }
+
+  latestImage = req.file.buffer;   // ← ★ 正しい保存先
   console.log("Image received:", latestImage.length, "bytes");
   res.sendStatus(200);
 });
@@ -58,7 +63,6 @@ app.get("/view", (req, res) => {
 
       <script>
         function refreshImage() {
-          // キャッシュ防止用に?timestamp を付与
           document.getElementById("cam").src = "/latest.jpg?t=" + Date.now();
         }
       </script>
