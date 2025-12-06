@@ -4,37 +4,37 @@
 
 const express = require("express");
 const multer  = require("multer");
-const path    = require("path");
 
 const app = express();
 const upload = multer();
 
-// 画像を保存する変数
+// 最新の JPEG 画像を保存する変数
 let latestImage = null;
 
-// ESP32 からの画像アップロード（POST）
+// ESP32 から画像アップロード（POST）
+// ★絶対に req.file.buffer を使うこと！★
 app.post("/upload", upload.single("file"), (req, res) => {
   if (!req.file || !req.file.buffer) {
-    console.log("No file received");
-    return res.sendStatus(400);
+    console.log("No file received!");
+    return res.status(400).send("No file received");
   }
 
-  latestImage = req.file.buffer;   // ← ★ 正しい保存先
+  latestImage = req.file.buffer;  // ← 正しい！
   console.log("Image received:", latestImage.length, "bytes");
+
   res.sendStatus(200);
 });
 
 // 最新画像を返す
 app.get("/latest.jpg", (req, res) => {
   if (!latestImage) {
-    res.status(404).send("No image yet");
-    return;
+    return res.status(404).send("No image yet");
   }
   res.set("Content-Type", "image/jpeg");
   res.send(latestImage);
 });
 
-// HTML（手動更新）
+// 手動ビュー
 app.get("/view", (req, res) => {
   res.send(`
     <html>
@@ -71,7 +71,7 @@ app.get("/view", (req, res) => {
   `);
 });
 
-// ポート
+// Render ポート
 const port = process.env.PORT || 10000;
 app.listen(port, () => {
   console.log("Server running on port", port);
