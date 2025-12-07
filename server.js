@@ -1,32 +1,41 @@
 const express = require("express");
+const multer = require("multer");
+
 const app = express();
 
-// JPEG を raw バイナリとして受け取る
-app.use(express.raw({ type: "image/jpeg", limit: "10mb" }));
+// バッファとして受け取る
+const upload = multer({
+  storage: multer.memoryStorage()
+});
 
+// 最新画像を保存する変数（null のままで OK）
 let latestImage = null;
 
-// ESP32 からの画像アップロード
-app.post("/upload", (req, res) => {
-  if (!req.body || req.body.length === 0) {
-    console.log("No image received");
+// ESP32 からのアップロード処理
+app.post("/upload", upload.single("file"), (req, res) => {
+  if (!req.file) {
+    console.log("No file uploaded");
     return res.sendStatus(400);
   }
 
-  latestImage = req.body;
+  latestImage = req.file.buffer;
   console.log("Image received:", latestImage.length, "bytes");
   res.sendStatus(200);
 });
 
-// 最新画像を返す
+// 最新画像を返す（404 を返さない → 画像が消えなくなる）
 app.get("/latest.jpg", (req, res) => {
-  if (!latestImage) return res.status(404).send("No image yet");
+  if (!latestImage) {
+    // 初回のみ「画像なし」だが 404 を返すとブラウザが画像を消すため 204 にする
+    return res.status(204).end();
+  }
 
+  // 通常は最新の JPEG を返す
   res.set("Content-Type", "image/jpeg");
   res.send(latestImage);
 });
 
-// Viewer
+// Viewer ページ
 app.get("/view", (req, res) => {
   res.send(`
     <html>
@@ -35,11 +44,16 @@ app.get("/view", (req, res) => {
     </head>
     <body style="text-align:center;">
       <h1>ESP32-CAM Viewer</h1>
+
       <button onclick="refreshImage()">画像更新</button><br>
-      <img id="cam" src="/latest.jpg" style="width:90%;max-width:600px;margin-top:20px;">
+
+      <img id="cam" src="/latest.jpg" 
+           style="width:90%;max-width:600px;margin-top:20px;border:1px solid #ccc;">
+
       <script>
         function refreshImage() {
-          document.getElementById("cam").src = "/latest.jpg?t=" + Date.now();
+          const img = document.getElementById("cam");
+          img.src = "/latest.jpg?t=" + Date.now(); // キャッシュ防止
         }
       </script>
     </body>
