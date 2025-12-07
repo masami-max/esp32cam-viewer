@@ -1,39 +1,32 @@
 const express = require("express");
-const multer = require("multer");
-
 const app = express();
 
-// バッファとして受け取る
-const upload = multer({
-  storage: multer.memoryStorage()
-});
+// JPEG を raw バイナリとして受け取る
+app.use(express.raw({ type: "image/jpeg", limit: "10mb" }));
 
-// 最新画像を保存する変数
 let latestImage = null;
 
-// ESP32 からのアップロード処理
-app.post("/upload", upload.single("file"), (req, res) => {
-  if (!req.file) {
-    console.log("No file uploaded");
+// ESP32 からの画像アップロード
+app.post("/upload", (req, res) => {
+  if (!req.body || req.body.length === 0) {
+    console.log("No image received");
     return res.sendStatus(400);
   }
 
-  latestImage = req.file.buffer;
+  latestImage = req.body;
   console.log("Image received:", latestImage.length, "bytes");
   res.sendStatus(200);
 });
 
 // 最新画像を返す
 app.get("/latest.jpg", (req, res) => {
-  if (!latestImage) {
-    return res.status(404).send("No image yet");
-  }
+  if (!latestImage) return res.status(404).send("No image yet");
 
   res.set("Content-Type", "image/jpeg");
   res.send(latestImage);
 });
 
-// Viewer ページ
+// Viewer
 app.get("/view", (req, res) => {
   res.send(`
     <html>
