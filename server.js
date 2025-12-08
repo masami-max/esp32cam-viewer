@@ -1,59 +1,52 @@
-const express = require("express");
-const bodyParser = require("body-parser");
+// server.js
+import express from "express";
+import bodyParser from "body-parser";
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-// ★ 生バイナリをそのまま受け取れる設定
-app.use(bodyParser.raw({ type: 'image/jpeg', limit: '10mb' }));
+let latestImage = null; // ← ESP32 から届いた最新JPEGを保存するバッファ
 
-// 最新画像の保存場所
-let latestImage = null;
-
-// ★ ESP32 から画像を受信（生バイナリ方式）
+//----------------------------------------------------
+// ① ESP32-CAM から JPEG を受け取るエンドポイント
+//----------------------------------------------------
 app.post("/upload", (req, res) => {
-  if (!req.body || req.body.length === 0) {
-    console.log("No binary data received");
-    return res.status(400).send("No image received");
-  }
+  const chunks = [];
 
-  latestImage = Buffer.from(req.body);
-  console.log("Image received:", latestImage.length, "bytes");
-  res.sendStatus(200);
+  req.on("data", (chunk) => {
+    chunks.push(chunk); // 受信データを配列に蓄積
+  });
+
+  req.on("end", () => {
+    latestImage = Buffer.concat(chunks); // 完成した JPEG
+    console.log(`Image received: ${latestImage.length} bytes`);
+    res.status(200).send("OK");
+  });
+
+  req.on("error", (err) => {
+    console.error("Upload error:", err);
+    res.status(500).send("Upload failed");
+  });
 });
 
-// ★ 最新画像を返す
-app.get("/latest.jpg", (req, res) => {
+//----------------------------------------------------
+// ② ブラウザが最新画像を取得するエンドポイント
+//----------------------------------------------------
+app.get("/snapshot", (req, res) => {
   if (!latestImage) {
     return res.status(404).send("No image yet");
   }
 
   res.set("Content-Type", "image/jpeg");
-  res.send(latestImage);
+  res.send(latestImage); // 完成した JPEG を一括送信（←超重要）
 });
 
-// ★ Viewer ページ
-app.get("/view", (req, res) => {
-  res.send(`
-    <html>
-    <head>
-      <title>ESP32-CAM Viewer</title>
-    </head>
-    <body style="text-align:center;">
-      <h1>ESP32-CAM Viewer</h1>
-      <button onclick="refreshImage()">画像更新</button><br>
-      <img id="cam" src="/latest.jpg" style="width:90%;max-width:600px;margin-top:20px;">
-      <script>
-        function refreshImage() {
-          document.getElementById("cam").src = "/latest.jpg?t=" + Date.now();
-        }
-      </script>
-    </body>
-    </html>
-  `);
-});
+//----------------------------------------------------
+// ③ 静的ファイル配信（あなたの index.html）
+//----------------------------------------------------
+app.use(express.static("public"));
 
-// ★ ポート番号
-const port = process.env.PORT || 10000;
-app.listen(port, () => {
-  console.log("Server running on port", port);
+//----------------------------------------------------
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
