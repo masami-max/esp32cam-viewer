@@ -1,52 +1,65 @@
-// server.js
+// server.js（完全安定版・生バイナリ受信 → ブラウザ即時表示）
+
 import express from "express";
-import bodyParser from "body-parser";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
-let latestImage = null; // ← ESP32 から届いた最新JPEGを保存するバッファ
+// ===== Static フォルダ =====
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+app.use(express.static(path.join(__dirname, "public")));
 
-//----------------------------------------------------
-// ① ESP32-CAM から JPEG を受け取るエンドポイント
-//----------------------------------------------------
+// ===== 画像保持用バッファ =====
+let latestImage = null;
+
+// ===== 画像 POST 受信 =====
 app.post("/upload", (req, res) => {
-  const chunks = [];
-
-  req.on("data", (chunk) => {
-    chunks.push(chunk); // 受信データを配列に蓄積
+  let data = [];
+  req.on("data", chunk => {
+    data.push(chunk);
   });
 
   req.on("end", () => {
-    latestImage = Buffer.concat(chunks); // 完成した JPEG
+    latestImage = Buffer.concat(data);
     console.log(`Image received: ${latestImage.length} bytes`);
     res.status(200).send("OK");
   });
-
-  req.on("error", (err) => {
-    console.error("Upload error:", err);
-    res.status(500).send("Upload failed");
-  });
 });
 
-//----------------------------------------------------
-// ② ブラウザが最新画像を取得するエンドポイント
-//----------------------------------------------------
-app.get("/snapshot", (req, res) => {
+// ===== 画像を返す =====
+app.get("/latest.jpg", (req, res) => {
   if (!latestImage) {
     return res.status(404).send("No image yet");
   }
-
-  res.set("Content-Type", "image/jpeg");
-  res.send(latestImage); // 完成した JPEG を一括送信（←超重要）
+  res.writeHead(200, { "Content-Type": "image/jpeg" });
+  res.end(latestImage);
 });
 
-//----------------------------------------------------
-// ③ 静的ファイル配信（あなたの index.html）
-//----------------------------------------------------
-app.use(express.static("public"));
+// ===== ビュー画面 =====
+app.get("/view", (req, res) => {
+  res.send(`
+  <html>
+    <body>
+      <h2>ESP32-CAM Viewer</h2>
+      <img id="cam" src="/latest.jpg" width="640"><br><br>
+      <button onclick="reload()">画像更新</button>
 
-//----------------------------------------------------
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+      <script>
+        function reload() {
+          document.getElementById("cam").src = "/latest.jpg?t=" + Date.now();
+        }
+      </script>
+    </body>
+  </html>
+  `);
+});
+
+// ===== Render Port =====
+const port = process.env.PORT || 10000;
+app.listen(port, () => {
+  console.log("Server running on port", port);
 });
