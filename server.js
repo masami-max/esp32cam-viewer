@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 
 const app = express();
-const PORT = process.env.PORT || 1000;
+const PORT = process.env.PORT;
 
 // ===== 画像保存先 =====
 const IMAGE_PATH = path.join(__dirname, "latest.jpg");
