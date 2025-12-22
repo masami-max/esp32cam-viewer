@@ -1,23 +1,20 @@
 const express = require("express");
 const app = express();
 
-const PORT = process.env.PORT || 10000;
+// ★ バイナリ受信用（最大1MB）
+app.use("/upload", express.raw({ type: "*/*", limit: "1mb" }));
 
-/* 文字列を受け取るため */
-app.use(express.text({ type: "*/*" }));
-
-/* トップページ */
 app.get("/", (req, res) => {
-  res.send("<h1>Render is running</h1>");
+  res.send("Render is running");
 });
 
-/* ESP32 からの POST を受け取る */
 app.post("/upload", (req, res) => {
   console.log("POST /upload called");
-  console.log("Body:", req.body);
+  console.log("Received bytes:", req.body.length);
   res.send("OK");
 });
 
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
