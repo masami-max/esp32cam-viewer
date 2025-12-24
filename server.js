@@ -7,9 +7,22 @@ app.use("/upload", express.raw({ type: "*/*", limit: "2mb" }));
 app.get("/", (req, res) => {
   res.send(`
     <html>
+      <head>
+        <title>ESP32-CAM Image Test</title>
+      </head>
       <body>
         <h1>ESP32-CAM Image Test</h1>
-        <img src="/latest.jpg" style="max-width:100%;" />
+        <img id="cam" style="max-width:100%;" />
+
+        <script>
+          function updateImage() {
+            const img = document.getElementById("cam");
+            img.src = "/latest.jpg?t=" + new Date().getTime();
+          }
+
+          updateImage();              // 初回表示
+          setInterval(updateImage, 3000); // 3秒ごと
+        </script>
       </body>
     </html>
   `);
